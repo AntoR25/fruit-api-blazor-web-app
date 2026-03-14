@@ -71,7 +71,7 @@ https://localhost:xxxx
 
 ---
 
-##REMACLE Antoine
+## REMACLE Antoine
 
 Projet réalisé dans le cadre d'un exercice sur **Blazor et les API REST**.
 
