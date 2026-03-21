@@ -1,102 +1,60 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using FruitWebApp.Models;
-using System.Text.Json;
-using Microsoft.AspNetCore.Components.Web;
+using System.Net.Http.Json;
 
 namespace FruitWebApp.Components.Pages;
 
 public partial class Home : ComponentBase
 {
-    [Inject]
-    public required IHttpClientFactory HttpClientFactory { get; set; }
+    [Inject] public IHttpClientFactory HttpClientFactory { get; set; } = default!;
+    [Inject] public NavigationManager NavigationManager { get; set; } = default!;
+    [Inject] public ProtectedLocalStorage ProtectedLocalStorage { get; set; } = default!;
 
-    [Inject]
-    private NavigationManager? NavigationManager { get; set; }
+    private List<FruitModel>? _fruitList;
+    private UserSession? CurrentUser;
+    private string Username = "";
+    private string Password = "";
+    private string ErrorMessage = "";
 
-    [Inject]
-    private ProtectedLocalStorage ProtectedLocalStorage { get; set; } = default!;
-
-    private IEnumerable<FruitModel>? _fruitList;
-
-    // --- Login ---
-    private string Username { get; set; } = "";
-    private string Password { get; set; } = "";
-    private string ErrorMessage { get; set; } = "";
-    private bool IsLoggedIn { get; set; } = false;
-
-    // OnInitializedAsync pour initialisation sans JS interop
-    protected override Task OnInitializedAsync()
-    {
-        // On ne fait rien avec ProtectedLocalStorage ici pour éviter l'erreur de prerender
-        return Task.CompletedTask;
-    }
-
-    // OnAfterRenderAsync pour JS interop (localStorage)
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // Lire le flag de login depuis le localStorage
-            var result = await ProtectedLocalStorage.GetAsync<bool>("isLoggedIn");
-            IsLoggedIn = result.Success && result.Value;
-
-            if (IsLoggedIn)
+            var res = await ProtectedLocalStorage.GetAsync<UserSession>("userSession");
+            if (res.Success && res.Value != null)
             {
+                CurrentUser = res.Value;
                 await LoadFruits();
+                StateHasChanged();
             }
-
-            // Forcer le rendu pour mettre à jour l'UI après la lecture du localStorage
-            StateHasChanged();
         }
     }
 
     private async Task LoadFruits()
     {
-        var httpClient = HttpClientFactory.CreateClient("FruitAPI");
-        using HttpResponseMessage response = await httpClient.GetAsync("/fruits");
-
-        if (response.IsSuccessStatusCode)
-        {
-            using var contentStream = await response.Content.ReadAsStreamAsync();
-            _fruitList = await JsonSerializer.DeserializeAsync<IEnumerable<FruitModel>>(contentStream);
-        }
-        else
-        {
-            Console.WriteLine($"Failed to load fruit list. Status code: {response.StatusCode}");
-        }
+        var client = HttpClientFactory.CreateClient("FruitAPI");
+        // On demande à l'API uniquement les fruits de CET utilisateur
+        _fruitList = await client.GetFromJsonAsync<List<FruitModel>>($"/fruits?userId={CurrentUser!.Id}");
     }
 
-    private void DeleteButton(int id) => NavigationManager!.NavigateTo($"/delete/{id}");
-    private void EditButton(int id) => NavigationManager!.NavigateTo($"/edit/{id}");
-
-    // --- Gestion du login ---
     private async Task LoginUser()
     {
-        if (Username == "admin" && Password == "admin")
-        {
-            IsLoggedIn = true;
-            ErrorMessage = "";
+        if (Username == "admin" && Password == "admin") CurrentUser = new UserSession { Id = 1, Username = "Admin" };
+        else if (Username == "toto" && Password == "toto") CurrentUser = new UserSession { Id = 2, Username = "Toto" };
 
-            // Stocker le login dans localStorage
-            await ProtectedLocalStorage.SetAsync("isLoggedIn", true);
-
-            await LoadFruits(); // Charger la liste après login
-        }
-        else
+        if (CurrentUser != null)
         {
-            ErrorMessage = "Nom d'utilisateur ou mot de passe incorrect";
-        }
+            await ProtectedLocalStorage.SetAsync("userSession", CurrentUser);
+            await LoadFruits();
+        } else { ErrorMessage = "Erreur d'identifiants"; }
     }
 
-    private async Task Logout()
-    {
-        IsLoggedIn = false;
-        Username = "";
-        Password = "";
-        _fruitList = null;
-
-        // Supprimer le flag dans localStorage
-        await ProtectedLocalStorage.DeleteAsync("isLoggedIn");
+    private async Task Logout() {
+        CurrentUser = null;
+        await ProtectedLocalStorage.DeleteAsync("userSession");
     }
+
+    private void EditButton(int id) => NavigationManager.NavigateTo($"/edit/{id}");
+    private void DeleteButton(int id) => NavigationManager.NavigateTo($"/delete/{id}");
 }

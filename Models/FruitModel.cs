@@ -1,15 +1,15 @@
-﻿using System.ComponentModel.DataAnnotations;
-
-
-namespace FruitWebApp.Models;
+﻿namespace FruitWebApp.Models;
 
 public class FruitModel
 {
-    [Key]
     public int id { get; set; }
-
-    [Display(Name="Fruit Name")]
-    public string? name { get; set; }
-    [Display(Name ="Favoris")]
+    public string name { get; set; } = "";
     public bool instock { get; set; }
+    public int userId { get; set; } // <--- CLEF DE LA SÉPARATION
+}
+
+public class UserSession
+{
+    public int Id { get; set; }
+    public string Username { get; set; } = "";
 }

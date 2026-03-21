@@ -1,48 +1,29 @@
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using FruitWebApp.Models;
-using System.Text.Json;
-using System.Text;
+using System.Net.Http.Json;
 
 namespace FruitWebApp.Components.Pages;
 
 public partial class Add : ComponentBase
 {
-    // IHttpClientFactory set using dependency injection 
-    [Inject]
-    public required IHttpClientFactory HttpClientFactory { get; set; }
+    [Inject] public IHttpClientFactory HttpClientFactory { get; set; } = default!;
+    [Inject] public NavigationManager NavigationManager { get; set; } = default!;
+    [Inject] public ProtectedLocalStorage ProtectedLocalStorage { get; set; } = default!;
 
-    // NavigationManager set using dependency injection
-    [Inject]
-    private NavigationManager? NavigationManager { get; set; }
-
-    // Add the data model and bind the form data to it
-    [SupplyParameterFromForm]
-    private FruitModel? _fruitList { get; set; }
-
-    protected override void OnInitialized() => _fruitList ??= new();
+    private FruitModel _fruit = new();
 
     private async Task Submit()
     {
-        // Serialize the information to be added to the database
-        var jsonContent = new StringContent(JsonSerializer.Serialize(_fruitList),
-            Encoding.UTF8,
-            "application/json");
-
-        // Create the HTTP client using the FruitAPI named factory
-        var httpClient = HttpClientFactory.CreateClient("FruitAPI");
-
-        // Execute the POST request and store the response. The response will contain the new record's ID
-        using HttpResponseMessage response = await httpClient.PostAsync("/fruits", jsonContent);
-
-        // Check if the operation was successful, and navigate to the home page if it was
-        if (response.IsSuccessStatusCode)
+        var res = await ProtectedLocalStorage.GetAsync<UserSession>("userSession");
+        if (res.Success && res.Value != null)
         {
-            NavigationManager?.NavigateTo("/");
-        }
-        else
-        {
-            Console.WriteLine("Failed to add fruit. Status code: {response.StatusCode}");
+            // ON LIE LE FRUIT À L'UTILISATEUR ICI
+            _fruit.userId = res.Value.Id;
+
+            var client = HttpClientFactory.CreateClient("FruitAPI");
+            await client.PostAsJsonAsync("/fruits", _fruit);
+            NavigationManager.NavigateTo("/");
         }
     }
 }

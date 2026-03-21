@@ -1,70 +1,56 @@
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage; // Pour ProtectedLocalStorage
 using FruitWebApp.Models;
-using System.Text.Json;
-using System.Text;
-using System;
+using System.Net.Http.Json; // Pour GetFromJsonAsync
 
 namespace FruitWebApp.Components.Pages;
 
 public partial class Delete : ComponentBase
 {
-    // IHttpClientFactory set using dependency injection 
-    [Inject]
-    public required IHttpClientFactory HttpClientFactory { get; set; }
+    [Parameter] public int Id { get; set; }
 
-    // NavigationManager set using dependency injection
-    [Inject]
-    private NavigationManager? NavigationManager { get; set; }
+    [Inject] public IHttpClientFactory HttpClientFactory { get; set; } = default!;
+    [Inject] public NavigationManager NavigationManager { get; set; } = default!;
+    [Inject] public ProtectedLocalStorage ProtectedLocalStorage { get; set; } = default!;
 
-    // Add the data model and bind the form data to the page model properties
-    [SupplyParameterFromForm]
-    private FruitModel? _fruitList { get; set; }
+    private FruitModel? _fruit;
 
-    // Add the parameter to the page
-    [Parameter]
-    public int? Id { get; set; }
-
-    // Initialize the fruit list
-    protected override void OnInitialized() => _fruitList ??= new();
-
-    //  Retrieve the data to populate the form for deletion
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Create the HTTP client using the FruitAPI named factory
-        var httpClient = HttpClientFactory.CreateClient("FruitAPI");
-
-        // Retrieve record information
-        using HttpResponseMessage response = await httpClient.GetAsync($"/fruits/{Id}");
-
-        if (response.IsSuccessStatusCode)
+        if (firstRender)
         {
-            // Deserialize the response to populate the form
-            using var contentStream = await response.Content.ReadAsStreamAsync();
-            _fruitList = await JsonSerializer.DeserializeAsync<FruitModel>(contentStream);
-        }
-        else
-        {
-            Console.WriteLine("Failed to retrieve fruit. Status code: {response.StatusCode}");
+            // Vérification de la session
+            var result = await ProtectedLocalStorage.GetAsync<UserSession>("userSession");
+            
+            if (!result.Success || result.Value == null)
+            {
+                NavigationManager.NavigateTo("/");
+                return;
+            }
+
+            // Récupération du fruit à supprimer
+            try 
+            {
+                var httpClient = HttpClientFactory.CreateClient("FruitAPI");
+                _fruit = await httpClient.GetFromJsonAsync<FruitModel>($"/fruits/{Id}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur : {ex.Message}");
+            }
+
+            StateHasChanged();
         }
     }
 
     private async Task Submit()
     {
-        // Create the HTTP client using the FruitAPI named factory
         var httpClient = HttpClientFactory.CreateClient("FruitAPI");
+        var response = await httpClient.DeleteAsync($"/fruits/{Id}");
 
-        // Execute the DELETE request and store the response
-        using HttpResponseMessage response = await httpClient.DeleteAsync("/fruits/" + Id.ToString());
-
-        // Return to the home page 
         if (response.IsSuccessStatusCode)
         {
-            NavigationManager?.NavigateTo("/");
-        }
-        else
-        {
-            Console.WriteLine("Failed to delete fruit. Status code: {response.StatusCode}");
+            NavigationManager.NavigateTo("/");
         }
     }
 }

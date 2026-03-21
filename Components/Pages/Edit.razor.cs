@@ -1,75 +1,37 @@
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using FruitWebApp.Models;
-using System.Text.Json;
-using System.Text;
-using System;
-
+using System.Net.Http.Json;
 
 namespace FruitWebApp.Components.Pages;
 
 public partial class Edit : ComponentBase
 {
-    // IHttpClientFactory set using dependency injection 
-    [Inject]
-    public required IHttpClientFactory HttpClientFactory { get; set; }
+    [Parameter] public int Id { get; set; }
+    [Inject] public IHttpClientFactory HttpClientFactory { get; set; } = default!;
+    [Inject] public NavigationManager NavigationManager { get; set; } = default!;
+    [Inject] public ProtectedLocalStorage ProtectedLocalStorage { get; set; } = default!;
 
-    // NavigationManager set using dependency injection
-    [Inject]
-    private NavigationManager? NavigationManager { get; set; }
+    private FruitModel? _fruit;
 
-    // Add the data model and bind the form data to it
-    [SupplyParameterFromForm]
-    private FruitModel? _fruitList { get; set; }
-
-    // Get the Id of the record to edit from the query string
-    [Parameter]
-    public int? Id { get; set; }
-
-    // Create instance of data model when page is initialized
-    protected override void OnInitialized() => _fruitList ??= new FruitModel();
-
-    // Retrieve the data to populate the form for editing
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Create the HTTP client using the FruitAPI named factory
-        var httpClient = HttpClientFactory.CreateClient("FruitAPI");
-
-        // Retrieve record information
-        using HttpResponseMessage response = await httpClient.GetAsync("/fruits/" + Id.ToString());
-
-        if (response.IsSuccessStatusCode)
+        if (firstRender)
         {
-            // Deserialize the response to populate the form
-            using var contentStream = await response.Content.ReadAsStreamAsync();
-            _fruitList = await JsonSerializer.DeserializeAsync<FruitModel>(contentStream);
-        }
-        else
-        {
-            Console.WriteLine("Failed to retrieve fruit. Status code: {response.StatusCode}");
+            var res = await ProtectedLocalStorage.GetAsync<UserSession>("userSession");
+            if (!res.Success) NavigationManager.NavigateTo("/");
+
+            var client = HttpClientFactory.CreateClient("FruitAPI");
+            _fruit = await client.GetFromJsonAsync<FruitModel>($"/fruits/{Id}");
+            StateHasChanged();
         }
     }
 
     private async Task Submit()
     {
-        // Create the HTTP client using the FruitAPI named factory
-        var httpClient = HttpClientFactory.CreateClient("FruitAPI");
-
-        // Store the updated data in a JSON object
-        var jsonContent = new StringContent(JsonSerializer.Serialize(_fruitList), 
-            Encoding.UTF8, "application/json");
-
-        // Execute the PUT request
-        using HttpResponseMessage response = await httpClient.PutAsync($"/fruits/{Id}", jsonContent);
-
-        // If the response is successful, navigate back to the home page 
-        if (response.IsSuccessStatusCode)
-        {
-            NavigationManager?.NavigateTo("/");
-        }
-        else
-        {
-            Console.WriteLine("Failed to update fruit with edits. Status code: {response.StatusCode}");
-        }
+        var client = HttpClientFactory.CreateClient("FruitAPI");
+        // On s'assure de renvoyer le fruit avec son userId
+        await client.PutAsJsonAsync($"/fruits/{Id}", _fruit);
+        NavigationManager.NavigateTo("/");
     }
 }

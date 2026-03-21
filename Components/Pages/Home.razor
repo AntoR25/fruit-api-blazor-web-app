@@ -1,87 +1,39 @@
 ﻿@page "/"
 @rendermode InteractiveServer
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Fruits de @(CurrentUser?.Username ?? "Connexion")</PageTitle>
 
-@* --- Login si pas connecté --- *@
-@if (!IsLoggedIn)
-{
-    <div class="col-md-4 border p-3 mb-4">
-        <h4>Connexion</h4>
-        <div class="mb-3">
-            <label>Nom d'utilisateur</label>
-            <input class="form-control" @bind="Username" />
+@if (CurrentUser == null) {
+    <div class="container mt-5 text-center">
+        <div class="card p-4 shadow-sm mx-auto" style="max-width: 400px;">
+            <h4>Connexion</h4>
+            <input class="form-control mb-2" @bind="Username" placeholder="Utilisateur" />
+            <input type="password" class="form-control mb-3" @bind="Password" placeholder="Mot de passe" />
+            <button class="btn btn-primary w-100" @onclick="LoginUser">Entrer</button>
+            @if (!string.IsNullOrEmpty(ErrorMessage)) { <p class="text-danger mt-2">@ErrorMessage</p> }
         </div>
-        <div class="mb-3">
-            <label>Mot de passe</label>
-            <input type="password" class="form-control" @bind="Password" />
-        </div>
-        <button class="btn btn-primary" @onclick="LoginUser">Se connecter</button>
-        @if (!string.IsNullOrEmpty(ErrorMessage))
-        {
-            <div class="text-danger mt-2">@ErrorMessage</div>
-        }
     </div>
-}
-else
-{
-    @* --- Contenu existant (tableau) seulement si connecté --- *@
-    <div class="container p-3">
-        <div>
-            <div class="col border-bottom" style="width:80%">
-                <h2 class="display-6">My Fruit List</h2>
-                <p>My fruits and add to starred list.</p>
-            </div>
+} else {
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between border-bottom pb-3">
+            <h2>Mes Fruits (@CurrentUser.Username)</h2>
+            <button class="btn btn-sm btn-outline-danger" @onclick="Logout">Déconnexion</button>
         </div>
-
-        <div class="container pt-4">
-            <div class="row" style="width:80%">
-                <div class="col text-end pb-4">
-                    <a class="btn btn-primary mx-2 text-end" href="/add" >
-                        Add to list
-                    </a>
-                    <button class="btn btn-secondary" @onclick="Logout">Log-out</button>
-                </div>
-            </div>
+        <div class="text-end my-3">
+            <a href="/add" class="btn btn-success">+ Ajouter un fruit</a>
         </div>
-
-        <table class="table table-bordered table-striped" style="width:80%">
+        <table class="table table-striped">
             <thead>
-                <tr>
-                    <th>Fruit Name</th>
-                    <th class="text-center">favorites</th>
-                    <th class="text-center">Manage</th>
-                </tr>
+                <tr><th>Nom</th><th class="text-center">Favori</th><th class="text-center">Actions</th></tr>
             </thead>
-
             <tbody>
-                @foreach (var obj in _fruitList ?? [])
-                {
+                @foreach (var f in _fruitList ?? []) {
                     <tr>
-                        <td width="50%">@obj.name</td>
-                        @{
-                            if (@obj.instock)
-                            {
-                                <td width="20%" class="text-md-center">
-                                    ⭐
-                                </td>
-                            }
-                            else
-                            {
-                                <td width="20%" class="text-md-center">
-                                    ❌
-                                </td>
-                            }
-                        }
-                        <td width="30%" class="text-center">
-                            <div class="w-75 btn-group btn-group-sm" role="group" style="text-align:center">
-                                <button class="btn btn-primary mx-2" @onclick="() => EditButton(obj.id)">
-                                    Edit
-                                </button>
-                                <button class="btn btn-danger mx-2" @onclick="() => DeleteButton(obj.id)">
-                                    Delete
-                                </button>
-                            </div>
+                        <td>@f.name</td>
+                        <td class="text-center">@(f.instock ? "⭐" : "❌")</td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-primary" @onclick="() => EditButton(f.id)">Modifier</button>
+                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteButton(f.id)">Supprimer</button>
                         </td>
                     </tr>
                 }
