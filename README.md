@@ -1,5 +1,14 @@
 # Fruit Web App
 
+api : https://github.com/AntoR25/fruit-api-dl-main
+
+log : admin/admin
+<img width="1343" height="671" alt="admin" src="https://github.com/user-attachments/assets/73069721-a7dc-442b-9064-d194ec03fe72" />
+
+log : toto/toto
+<img width="1325" height="682" alt="toto" src="https://github.com/user-attachments/assets/8dcdcd5a-6fea-4d44-bb9c-e9f9783ff9a6" />
+
+
 ## Description
 
 Cette application est une interface web qui permet de gérer une liste de fruits via une API.
